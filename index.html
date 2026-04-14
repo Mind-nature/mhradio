@@ -41,6 +41,7 @@ html, body {
   padding: 16px 20px 10px;
   text-align: center;
   flex-shrink: 0;
+  position: relative;
 }
 .header h1 {
   font-family: 'Noto Serif TC', serif;
@@ -53,6 +54,28 @@ html, body {
   color: var(--gold-dim);
   margin-top: 2px;
   letter-spacing: 2px;
+}
+.daily-update {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--gold-dim);
+}
+.daily-update-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 4px #4ade8088;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px #4ade8088; }
+  50% { opacity: 0.3; box-shadow: 0 0 1px #4ade8044; }
 }
 
 /* ── Player Bar ── */
@@ -303,6 +326,10 @@ html, body {
   <div class="header">
     <h1>明慧廣播電台</h1>
     <div class="subtitle">MINGHUI RADIO</div>
+    <div class="daily-update">
+      <div class="daily-update-dot"></div>
+      每日早上6點更新
+    </div>
   </div>
 
   <!-- Player Bar -->
