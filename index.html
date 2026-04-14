@@ -273,6 +273,14 @@ html, body {
 }
 .tab .icon { font-size: 20px; }
 .tab.active { color: var(--gold); }
+.tab.active::after {
+  content: '';
+  display: block;
+  width: 20px; height: 3px;
+  background: var(--gold);
+  border-radius: 2px;
+  margin-top: 2px;
+}
 </style>
 </head>
 <body>
@@ -381,8 +389,7 @@ const TABS = {
     subs: [
       { name: '普度', id: 'showprogram/20', type: 'program' },
       { name: '濟世', id: 'showprogram/71', type: 'program' },
-      { name: '天音淨樂', id: 40 },
-      { name: '煉功音樂', id: null, type: 'external', url: 'https://www.mhradio.org/showprogram/127.html' }
+      { name: '天音淨樂', id: 40 }
     ]
   }
 };
@@ -549,15 +556,17 @@ async function loadProgramDirectly(programPath) {
     if (mp3Link) {
       const title = doc.querySelector('title')?.textContent?.trim() || currentSub.name;
       programs = [{ id: programPath, title: title, mp3: mp3Link }];
-      currentIndex = 0;
+      currentIndex = -1;
 
-      programList.innerHTML = `<div class="program-item active" data-idx="0">
+      programList.innerHTML = `<div class="program-item" data-idx="0">
         <span class="idx">1</span>
         <div class="info"><div class="title">${title}</div></div>
         <span class="play-icon">▶</span>
       </div>`;
 
-      startAudio(mp3Link, title);
+      programList.querySelector('.program-item').addEventListener('click', () => {
+        playProgram(0);
+      });
     } else {
       programList.innerHTML = '<div class="empty-msg">找不到音頻檔案</div>';
     }
