@@ -342,7 +342,7 @@ html, body {
       <span class="icon">🏠</span>首頁
     </button>
     <button class="tab" data-tab="live">
-      <span class="icon">📡</span>即時短波
+      <span class="icon">📡</span>短波收聽
     </button>
     <button class="tab" data-tab="cultivation">
       <span class="icon">🙏</span>修煉園地
@@ -368,7 +368,7 @@ const BASE = 'https://www.mhradio.org';
 // ── Category Data ──
 const TABS = {
   live: {
-    label: '即時短波',
+    label: '短波收聽',
     subs: [
       { name: '明慧時事', id: 144 },
       { name: '修煉交流', id: 145 }
@@ -633,12 +633,25 @@ async function loadSubcategory() {
   }
 
   // Category listing
+  const cacheKey = `mhradio_cat_${currentSub.id}_${currentPage}`;
+  const cacheTimeKey = cacheKey + '_time';
+  const cached = localStorage.getItem(cacheKey);
+  const cachedTime = parseInt(localStorage.getItem(cacheTimeKey) || '0');
+  const today6am = getToday6amTW();
+
+  if (cached && cachedTime >= today6am) {
+    parseAndRenderList(cached);
+    return;
+  }
+
   programList.innerHTML = '<div class="loading">載入中…</div>';
   const url = `${BASE}/showcategory/${currentSub.id}/${currentPage}.html`;
 
   try {
     const res = await fetch(PROXY + encodeURIComponent(url));
     const html = await res.text();
+    localStorage.setItem(cacheKey, html);
+    localStorage.setItem(cacheTimeKey, Date.now().toString());
     parseAndRenderList(html);
   } catch (err) {
     programList.innerHTML = `<div class="empty-msg">載入失敗，請稍後再試<br><small>${err.message}</small></div>`;
@@ -708,10 +721,28 @@ function parseAndRenderList(html) {
 
 // ── Load Single Program (for music tab) ──
 async function loadProgramDirectly(programPath) {
-  const url = `${BASE}/${programPath}.html`;
+  const cacheKey = `mhradio_prog_${programPath.replace(/\//g, '_')}`;
+  const cacheTimeKey = cacheKey + '_time';
+  const cached = localStorage.getItem(cacheKey);
+  const cachedTime = parseInt(localStorage.getItem(cacheTimeKey) || '0');
+  const today6am = getToday6amTW();
+
+  let html;
+  if (cached && cachedTime >= today6am) {
+    html = cached;
+  } else {
+    const url = `${BASE}/${programPath}.html`;
+    try {
+      const res = await fetch(PROXY + encodeURIComponent(url));
+      html = await res.text();
+      localStorage.setItem(cacheKey, html);
+      localStorage.setItem(cacheTimeKey, Date.now().toString());
+    } catch (err) {
+      programList.innerHTML = `<div class="empty-msg">載入失敗<br><small>${err.message}</small></div>`;
+      return;
+    }
+  }
   try {
-    const res = await fetch(PROXY + encodeURIComponent(url));
-    const html = await res.text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const mp3Link = findMp3(doc);
     if (mp3Link) {
