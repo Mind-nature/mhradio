@@ -867,6 +867,10 @@ btnPlay.addEventListener('click', () => {
   if (!audio.src || audio.src === location.href) {
     if (programs.length > 0) {
       playProgram(0);
+    } else {
+      // Home page: click the first program item
+      const firstItem = programList.querySelector('.program-item[data-href]');
+      if (firstItem) firstItem.click();
     }
     return;
   }
