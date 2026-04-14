@@ -456,9 +456,14 @@ async function loadSubcategory() {
 }
 
 // ── Parse Category Page ──
+// Sidebar program IDs to exclude (普度, 濟世, 煉功音樂 etc.)
+const SIDEBAR_IDS = new Set(['20', '71', '127', '128']);
+
 function parseAndRenderList(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const links = doc.querySelectorAll('a[href*="showprogram/"]');
+  // Try main content area first, fallback to full page
+  const container = doc.querySelector('.main-content, .content, .program-list, #content, article') || doc;
+  const links = container.querySelectorAll('a[href*="showprogram/"]');
   programs = [];
   const seen = new Set();
 
@@ -468,6 +473,7 @@ function parseAndRenderList(html) {
     if (!match) return;
     const pid = match[1];
     if (seen.has(pid)) return;
+    if (SIDEBAR_IDS.has(pid)) return; // skip sidebar links
     seen.add(pid);
     const text = a.textContent.trim();
     if (!text) return;
