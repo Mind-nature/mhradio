@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -8,6 +9,11 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   next();
+});
+
+// Serve index.html at root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.get('/fetch', async (req, res) => {

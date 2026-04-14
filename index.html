@@ -316,7 +316,9 @@ html, body {
 
 <script>
 // ── Config ──
-const PROXY = 'https://mhradio.up.railway.app/fetch?url=';
+const PROXY = (location.hostname === 'localhost' || location.protocol === 'file:')
+  ? 'https://mhradio.up.railway.app/fetch?url='
+  : '/fetch?url=';
 const BASE = 'https://www.mhradio.org';
 
 // ── Category Data ──
