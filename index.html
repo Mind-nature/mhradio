@@ -609,8 +609,8 @@ function findMp3(doc) {
 
 // ── Audio Playback ──
 function startAudio(mp3Url, title) {
-  // Proxy the mp3 too for CORS
-  audio.src = PROXY + encodeURIComponent(mp3Url);
+  // Play mp3 directly from source (no proxy needed for audio)
+  audio.src = mp3Url;
   audio.play().then(() => {
     isPlaying = true;
     btnPlay.textContent = '⏸';
