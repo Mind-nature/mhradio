@@ -281,6 +281,19 @@ html, body {
   border-radius: 2px;
   margin-top: 2px;
 }
+
+/* ── Home Page ── */
+.home-section {
+  margin-bottom: 16px;
+}
+.home-section-title {
+  font-family: 'Noto Serif TC', serif;
+  font-size: 16px;
+  color: var(--gold);
+  padding: 8px 4px;
+  border-bottom: 1px solid #2e261d;
+  margin-bottom: 8px;
+}
 </style>
 </head>
 <body>
@@ -325,7 +338,10 @@ html, body {
 
   <!-- Tab Bar -->
   <div class="tab-bar" id="tabBar">
-    <button class="tab active" data-tab="live">
+    <button class="tab active" data-tab="home">
+      <span class="icon">🏠</span>首頁
+    </button>
+    <button class="tab" data-tab="live">
       <span class="icon">📡</span>即時短波
     </button>
     <button class="tab" data-tab="cultivation">
@@ -395,7 +411,7 @@ const TABS = {
 };
 
 // ── State ──
-let currentTab = 'live';
+let currentTab = 'home';
 let currentSub = null;
 let currentPage = 1;
 let programs = [];
@@ -429,6 +445,11 @@ tabBar.addEventListener('click', e => {
 
 // ── Chips ──
 function renderChips() {
+  if (currentTab === 'home') {
+    chipBar.innerHTML = '';
+    loadHomePage();
+    return;
+  }
   const subs = TABS[currentTab].subs;
   chipBar.innerHTML = subs.map((s, i) =>
     `<div class="chip${i === 0 ? ' active' : ''}" data-idx="${i}">${s.name}</div>`
@@ -444,6 +465,146 @@ function renderChips() {
       currentSub = subs[+c.dataset.idx];
       currentPage = 1;
       loadSubcategory();
+    });
+  });
+}
+
+// ── Home Page ──
+function getToday6amTW() {
+  // Taiwan time = UTC+8
+  const now = Date.now();
+  const twNow = now + 8 * 3600000;
+  const twDay = Math.floor(twNow / 86400000);
+  const tw6am = twDay * 86400000 - 8 * 3600000 + 6 * 3600000; // 6am UTC+8 in UTC ms
+  return now >= tw6am ? tw6am : tw6am - 86400000;
+}
+
+async function loadHomePage() {
+  const cacheKey = 'mhradio_home';
+  const cacheTimeKey = 'mhradio_home_time';
+  const cached = localStorage.getItem(cacheKey);
+  const cachedTime = parseInt(localStorage.getItem(cacheTimeKey) || '0');
+  const today6am = getToday6amTW();
+
+  // Use cache if fetched after today's 6am
+  if (cached && cachedTime >= today6am) {
+    renderHomePage(cached);
+    return;
+  }
+
+  programList.innerHTML = '<div class="loading">載入中…</div>';
+  try {
+    const res = await fetch(PROXY + encodeURIComponent(BASE + '/'));
+    const html = await res.text();
+    localStorage.setItem(cacheKey, html);
+    localStorage.setItem(cacheTimeKey, Date.now().toString());
+    renderHomePage(html);
+  } catch (err) {
+    programList.innerHTML = `<div class="empty-msg">載入失敗<br><small>${err.message}</small></div>`;
+  }
+}
+
+function renderHomePage(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const tables = doc.querySelectorAll('table');
+  let latestItems = [];
+  let popularItems = [];
+
+  tables.forEach(table => {
+    const rows = table.querySelectorAll('tr');
+    const items = [];
+    rows.forEach(row => {
+      const link = row.querySelector('a[href*="showprogram/"]');
+      if (!link) return;
+      const href = link.getAttribute('href') || '';
+      const title = link.textContent.trim();
+      const cells = row.querySelectorAll('td');
+      let date = '', duration = '';
+      cells.forEach(cell => {
+        const text = cell.textContent.trim();
+        if (/^\d{4}\/\d{2}\/\d{2}$/.test(text)) date = text;
+        if (/分$/.test(text)) duration = text;
+      });
+      if (title) items.push({ title, href, date, duration });
+    });
+    if (items.length > 0) {
+      if (latestItems.length === 0) latestItems = items;
+      else if (popularItems.length === 0) popularItems = items;
+    }
+  });
+
+  if (latestItems.length === 0) {
+    const allLinks = doc.querySelectorAll('a[href*="showprogram/"]');
+    const seen = new Set();
+    allLinks.forEach(a => {
+      const href = a.getAttribute('href') || '';
+      const match = href.match(/showprogram\/(\d+)/);
+      if (!match || seen.has(match[1])) return;
+      if (SIDEBAR_IDS.has(match[1])) return;
+      seen.add(match[1]);
+      const title = a.textContent.trim();
+      if (title) latestItems.push({ title, href, date: '', duration: '' });
+    });
+  }
+
+  let content = '';
+  if (latestItems.length > 0) {
+    content += `<div class="home-section">
+      <div class="home-section-title">📻 最新收聽</div>
+      ${latestItems.map((p, i) => `<div class="program-item" data-href="${p.href}">
+        <span class="idx">${i + 1}</span>
+        <div class="info">
+          <div class="title">${p.title}</div>
+          <div class="date">${[p.date, p.duration].filter(Boolean).join(' · ')}</div>
+        </div>
+        <span class="play-icon">▶</span>
+      </div>`).join('')}
+    </div>`;
+  }
+  if (popularItems.length > 0) {
+    content += `<div class="home-section">
+      <div class="home-section-title">🔥 熱門節目</div>
+      ${popularItems.map((p, i) => `<div class="program-item" data-href="${p.href}">
+        <span class="idx">${i + 1}</span>
+        <div class="info">
+          <div class="title">${p.title}</div>
+          <div class="date">${[p.date, p.duration].filter(Boolean).join(' · ')}</div>
+        </div>
+        <span class="play-icon">▶</span>
+      </div>`).join('')}
+    </div>`;
+  }
+  if (!content) content = '<div class="empty-msg">暫無資料</div>';
+
+  programList.innerHTML = content;
+
+  programList.querySelectorAll('.program-item[data-href]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const href = el.dataset.href;
+      const title = el.querySelector('.title').textContent;
+      playerTitle.textContent = '載入中…';
+      playerTitle.classList.remove('empty');
+      const fullUrl = href.startsWith('http') ? href : `${BASE}/${href.replace(/^\//, '')}`;
+      try {
+        const r = await fetch(PROXY + encodeURIComponent(fullUrl));
+        const h = await r.text();
+        const d = new DOMParser().parseFromString(h, 'text/html');
+        const mp3 = findMp3(d);
+        if (mp3) {
+          programs = [{ id: href, title, mp3, href }];
+          currentIndex = 0;
+          playerTitle.textContent = title;
+          startAudio(mp3, title);
+          programList.querySelectorAll('.program-item').forEach(x => x.classList.remove('active'));
+          el.classList.add('active');
+        } else {
+          playerTitle.textContent = '找不到音頻';
+          playerTitle.classList.add('empty');
+        }
+      } catch (err) {
+        playerTitle.textContent = '載入失敗';
+        playerTitle.classList.add('empty');
+      }
     });
   });
 }
