@@ -76,20 +76,32 @@ html, body {
 .player-now.empty { color: var(--gold-dim); }
 .player-progress {
   width: 100%;
-  height: 4px;
+  height: 6px;
   background: #3a3028;
-  border-radius: 2px;
+  border-radius: 3px;
   margin-bottom: 8px;
   cursor: pointer;
   position: relative;
+  touch-action: none;
 }
 .player-progress-fill {
   height: 100%;
   background: var(--gold);
-  border-radius: 2px;
+  border-radius: 3px;
   width: 0%;
-  transition: width 0.3s linear;
+  pointer-events: none;
 }
+.player-progress-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px; height: 14px;
+  background: var(--gold-bright);
+  border-radius: 50%;
+  pointer-events: none;
+  display: none;
+}
+.player-progress.has-audio .player-progress-thumb { display: block; }
 .player-time {
   display: flex;
   justify-content: space-between;
@@ -277,15 +289,23 @@ html, body {
     <div class="player-now empty" id="playerTitle">選擇節目開始播放</div>
     <div class="player-progress" id="progressBar">
       <div class="player-progress-fill" id="progressFill"></div>
+      <div class="player-progress-thumb" id="progressThumb"></div>
     </div>
     <div class="player-time">
       <span id="timeCurrent">0:00</span>
       <span id="timeDuration">0:00</span>
     </div>
     <div class="player-controls">
-      <button class="player-btn" id="btnPrev" title="上一集">⏮</button>
-      <button class="player-btn play" id="btnPlay" title="播放">▶</button>
-      <button class="player-btn" id="btnNext" title="下一集">⏭</button>
+      <button class="player-btn" id="btnPrev" title="上一集">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+      </button>
+      <button class="player-btn play" id="btnPlay" title="播放" data-state="paused">
+        <svg class="icon-play" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg class="icon-pause" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>
+      </button>
+      <button class="player-btn" id="btnNext" title="下一集">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+      </button>
     </div>
   </div>
 
@@ -607,18 +627,37 @@ function findMp3(doc) {
   return match ? match[0] : null;
 }
 
+// ── Icon Helper ──
+const iconPlay = btnPlay.querySelector('.icon-play');
+const iconPause = btnPlay.querySelector('.icon-pause');
+function setPlayIcon(playing) {
+  iconPlay.style.display = playing ? 'none' : '';
+  iconPause.style.display = playing ? '' : 'none';
+}
+
 // ── Audio Playback ──
 function startAudio(mp3Url, title) {
-  // Play mp3 directly from source (no proxy needed for audio)
   audio.src = mp3Url;
+  progressBar.classList.add('has-audio');
   audio.play().then(() => {
     isPlaying = true;
-    btnPlay.textContent = '⏸';
+    setPlayIcon(true);
   }).catch(() => {
-    // Autoplay blocked — user will click play
     isPlaying = false;
-    btnPlay.textContent = '▶';
+    setPlayIcon(false);
   });
+}
+
+// ── Preload next track ──
+const preloadAudio = new Audio();
+function preloadNext() {
+  if (currentIndex < programs.length - 1) {
+    const next = programs[currentIndex + 1];
+    if (next && next.mp3) {
+      preloadAudio.src = next.mp3;
+      preloadAudio.preload = 'auto';
+    }
+  }
 }
 
 // ── Player Controls ──
@@ -627,11 +666,11 @@ btnPlay.addEventListener('click', () => {
   if (isPlaying) {
     audio.pause();
     isPlaying = false;
-    btnPlay.textContent = '▶';
+    setPlayIcon(false);
   } else {
     audio.play();
     isPlaying = true;
-    btnPlay.textContent = '⏸';
+    setPlayIcon(true);
   }
 });
 
@@ -649,28 +688,59 @@ audio.addEventListener('ended', () => {
     playProgram(currentIndex + 1);
   } else {
     isPlaying = false;
-    btnPlay.textContent = '▶';
+    setPlayIcon(false);
   }
 });
 
 // ── Progress Bar ──
-audio.addEventListener('timeupdate', () => {
-  if (!audio.duration) return;
-  const pct = (audio.currentTime / audio.duration) * 100;
+const progressThumb = document.getElementById('progressThumb');
+let isDragging = false;
+
+function updateProgress(pct) {
   progressFill.style.width = pct + '%';
+  progressThumb.style.left = pct + '%';
+}
+
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration || isDragging) return;
+  const pct = (audio.currentTime / audio.duration) * 100;
+  updateProgress(pct);
   timeCurrent.textContent = formatTime(audio.currentTime);
   timeDuration.textContent = formatTime(audio.duration);
 });
 
-progressBar.addEventListener('click', e => {
+audio.addEventListener('canplay', preloadNext, { once: false });
+
+function seekFromEvent(e) {
   if (!audio.duration) return;
   const rect = progressBar.getBoundingClientRect();
-  const pct = (e.clientX - rect.left) / rect.width;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  updateProgress(pct * 100);
   audio.currentTime = pct * audio.duration;
-});
+  timeCurrent.textContent = formatTime(audio.currentTime);
+}
 
-audio.addEventListener('play', () => { isPlaying = true; btnPlay.textContent = '⏸'; });
-audio.addEventListener('pause', () => { isPlaying = false; btnPlay.textContent = '▶'; });
+// Mouse drag
+progressBar.addEventListener('mousedown', e => {
+  if (!audio.duration) return;
+  isDragging = true;
+  seekFromEvent(e);
+});
+document.addEventListener('mousemove', e => { if (isDragging) seekFromEvent(e); });
+document.addEventListener('mouseup', () => { isDragging = false; });
+
+// Touch drag
+progressBar.addEventListener('touchstart', e => {
+  if (!audio.duration) return;
+  isDragging = true;
+  seekFromEvent(e);
+}, { passive: true });
+document.addEventListener('touchmove', e => { if (isDragging) seekFromEvent(e); }, { passive: true });
+document.addEventListener('touchend', () => { isDragging = false; });
+
+audio.addEventListener('play', () => { isPlaying = true; setPlayIcon(true); });
+audio.addEventListener('pause', () => { isPlaying = false; setPlayIcon(false); });
 
 function formatTime(s) {
   if (!s || isNaN(s)) return '0:00';
