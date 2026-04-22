@@ -605,33 +605,17 @@ function renderHomePage(html) {
 
   programList.innerHTML = content;
 
-  programList.querySelectorAll('.program-item[data-href]').forEach(el => {
-    el.addEventListener('click', async () => {
-      const href = el.dataset.href;
-      const title = el.querySelector('.title').textContent;
-      playerTitle.textContent = '載入中…';
-      playerTitle.classList.remove('empty');
-      const fullUrl = href.startsWith('http') ? href : `${BASE}/${href.replace(/^\//, '')}`;
-      try {
-        const r = await fetch(PROXY + encodeURIComponent(fullUrl));
-        const h = await r.text();
-        const d = new DOMParser().parseFromString(h, 'text/html');
-        const mp3 = findMp3(d);
-        if (mp3) {
-          programs = [{ id: href, title, mp3, href }];
-          currentIndex = 0;
-          playerTitle.textContent = title;
-          startAudio(mp3, title);
-          programList.querySelectorAll('.program-item').forEach(x => x.classList.remove('active'));
-          el.classList.add('active');
-        } else {
-          playerTitle.textContent = '找不到音頻';
-          playerTitle.classList.add('empty');
-        }
-      } catch (err) {
-        playerTitle.textContent = '載入失敗';
-        playerTitle.classList.add('empty');
-      }
+  // 把所有首頁節目放進 programs（懶加載 mp3）
+  const allHomeItems = programList.querySelectorAll('.program-item[data-href]');
+  programs = Array.from(allHomeItems).map(el => ({
+    title: el.querySelector('.title').textContent,
+    href: el.dataset.href,
+    mp3: null
+  }));
+
+  allHomeItems.forEach((el, i) => {
+    el.addEventListener('click', () => {
+      playProgram(i);
     });
   });
 }
